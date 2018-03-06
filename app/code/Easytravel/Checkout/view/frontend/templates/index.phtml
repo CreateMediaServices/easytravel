@@ -1,0 +1,104 @@
+
+
+<style>
+	input, select, textarea
+	{
+		margin-bottom: 15px;
+	}
+</style>
+
+<div>
+	<h2><strong>Order Summary</strong></h2>
+	<?php
+
+		$items = $this->getCartItems();
+
+		foreach($items as $item) 
+	    {
+	        echo 'ID: '.$item->getProductId().'<br />';
+	        echo 'Name: '.$item->getName().'<br />';
+	        
+	        /* This will get custom option value of cart item */
+	        $_itemTypeInstance = $item->getProduct()->getTypeInstance(true);
+
+	        if(method_exists($_itemTypeInstance, 'getOrderOptions'))
+			{
+				$_customOptions =  $_itemTypeInstance->getOrderOptions($item->getProduct());
+
+				if(is_array($_customOptions) && count($_customOptions) > 0)
+		        {
+		        	if(isset($_customOptions['options']))
+		        	{
+		        		foreach($_customOptions['options'] as $_option)
+				        {
+				            echo $_option['label'] .': '. $_option['value']."<br/>";
+				        }
+		        	}
+		        }
+			}
+
+	        echo 'Code: '.$item->getSku().'<br />';
+	        echo 'Quantity: '.$item->getQty().'<br />';
+	        echo 'Price: '.$item->getPrice().'<br />';
+
+	        echo '<br /><br />';
+	    }
+
+	?>
+</div>
+
+<h2>Select date</h2>
+
+<div>
+	<label>Select departure date</label>
+	<input type="text" />
+</div>
+
+<h2>Select extras</h2>
+
+<div>
+	<label>Numbers of passengers</label>
+	<input type="text" />
+</div>
+
+<h2>Flight details</h2>
+
+<div>
+	<label>Fight number</label>
+	<input type="text" />
+
+	<label>Fight number</label>
+	<input type="text" />
+</div>
+
+<br />
+<input type="submit" class="action primary" value="Submit" />
+
+<br /><br />
+<h4>
+	Getting WordPress Posts 
+	<br /><br />
+	by using <a href="https://fishpig.co.uk/magento-2/wordpress-integration/" target="_blank">FishPig, Magento WordPress Integration</a>
+</h4>
+
+<?php $objectManager = \Magento\Framework\App\ObjectManager::getInstance() ?>
+<?php $posts = $objectManager->create('FishPig\WordPress\Model\ResourceModel\Post\Collection')
+	->addPostTypeFilter('post')
+	->setOrderByPostDate()
+	->addIsViewableFilter()
+	->setPageSize(5)
+	->load(); ?>
+<?php if (count($posts) > 0): ?>
+	<ul>
+		<?php foreach($posts as $post): ?>
+			<li>
+				<a href="<?php echo $post->getUrl() ?>"><?php echo $this->escapeHtml($post->getPostTitle()) ?></a>
+				<?php if ($image = $post->getFeaturedImage()): ?>
+					<a href="<?php echo $post->getUrl() ?>">
+						<img src="<?php echo $image->getAvailableImage() ?>" src="<?php echo $this->escapeHtml($post->getPostTitle()) ?>" />
+					</a>
+				<?php endif; ?>
+				<p><?php echo $post->getPostExcerpt(40) ?></p></li>
+		<?php endforeach; ?>
+	</ul>
+<?php endif; ?>

@@ -1,0 +1,38 @@
+<?php 
+
+//Default Web URL: default was cms!
+
+$content = $block->getContent();
+
+$counter=1;
+
+$fieldIdentifierPrefix = 'banner_';
+
+while($counter < 5):
+
+	$slideImage = $content->getImage($fieldIdentifierPrefix.'image_'.$counter);
+	$slideHeading = $content->getData($fieldIdentifierPrefix.'heading_'.$counter);
+	$slideButtonTxt = $content->getData($fieldIdentifierPrefix.'button_text_'.$counter);
+	$slideButtonURL = $content->getData($fieldIdentifierPrefix.'button_url_'.$counter);
+
+	if($slideImage){
+?>
+		<img src="<?php echo $slideImage; ?>" alt='' />
+		<br /><br />
+<?php
+	}
+	if($slideHeading){
+?>
+		<h1><?php echo $slideHeading; ?></h1>
+<?php
+	}
+
+	if($slideButtonTxt && $slideButtonURL){
+?>
+		<a href="<?php echo $slideButtonURL; ?>" target="_blank"><?php echo $slideButtonTxt; ?></a>
+		<br />		
+<?php
+	}
+	$counter++;
+endwhile;
+?>

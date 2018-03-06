@@ -1,0 +1,502 @@
+<?php
+
+$objectManager  		= \Magento\Framework\App\ObjectManager::getInstance();
+$_coreHelper     		= $objectManager->get('Easytravel\Core\Helper\Functions');
+$product        		= $objectManager->get('Magento\Framework\Registry')->registry('current_product');//get current product
+$productTypeInstance 	= $product->getTypeInstance();
+$associatedProducts 	= $productTypeInstance->getUsedProducts($product);
+$productAttributeOptions= $productTypeInstance->getConfigurableAttributesAsArray($product);
+$attribute_set_id 		= $_coreHelper->getProdutAttributeGroupId($product);
+
+$duration 		= $product->getResource()->getAttribute('duration_days')->getFrontend()->getValue($product);
+$storeManager 	= $objectManager->get('Magento\Store\Model\StoreManagerInterface'); //instance of StoreManagerInterface
+$storeId 		= $storeManager->getStore()->getStoreId(); //get current store id if store id not get passed
+$discountPrices = array();
+
+$formKey 		= $objectManager->get('Magento\Framework\Data\Form\FormKey');
+
+foreach ($associatedProducts as $childProduct)
+{	
+	if($childProduct->getSpecialPrice())
+	{	
+		$currentDepartureDate	= $childProduct->getResource()->getAttribute('departure_dates')->getFrontend()->getValue($childProduct);
+		$specialPriceToDate		= $childProduct->getSpecialToDate();
+		$applySpecialPrice 		= false;
+		$addSpecialPrices		= false;
+		if($specialPriceToDate)
+		{
+			if(strtotime(date("Y-m-d",strtotime($specialPriceToDate))) > strtotime(date('Y-m-d')))
+			{
+				$applySpecialPrice = true;
+			}
+		}
+		else
+		{
+			$applySpecialPrice = true;
+		}
+
+		if($applySpecialPrice)
+		{
+			if($attribute_set_id == $_coreHelper->getPrivateGroupId())
+			{	
+				
+				$currentDepartureDate = substr($currentDepartureDate, 0,7);
+				if($currentDepartureDate == date('Y-m'))
+				{
+					$addSpecialPrices = true;
+				}
+			}
+			else
+			{
+				if(strtotime($currentDepartureDate) > strtotime(date('Y-m-d')))
+				{	
+					$addSpecialPrices = true;
+				}
+			}
+		}
+		
+		
+		if($addSpecialPrices==true)
+		{
+			$specialPrice 						= $childProduct->getSpecialPrice();
+			$discountedPrice					= $childProduct->getPrice();
+			$discountPercentage 				= number_format((1-$specialPrice/$discountedPrice) * 100 );
+			$_discountPrices['departure_date']  = $currentDepartureDate;
+			$_discountPrices['percentage'] 		= $discountPercentage;
+			$_discountPrices['original_price'] 	= $discountedPrice;
+			$_discountPrices['special_price'] 	= $specialPrice;
+			if(empty($discountPrices))
+			{
+				$discountPrices[]  = $_discountPrices; 
+			}
+			else
+			{	
+				$dateAlreadyExist = array_search($currentDepartureDate, array_column($discountPrices, 'departure_date'));
+				if($dateAlreadyExist === false)
+				{
+					$discountPrices[]  = $_discountPrices;
+				}
+			}
+		}
+	}
+}
+
+?>
+<div class="custom-form" style="float: right; width: 50%; margin: 20px;">
+	<h1>Custom Form </h1>
+	<h1><?php echo $duration." Days ".$product->getName();?></h1>
+	<h3>Trip Code: <?php echo $product->getSku();?></h3>
+	<h3>Group Name: <?php echo $_coreHelper->getProdutAttributeGroupName($product);?></h3>
+	<h3>Price : <?php echo $_coreHelper->getCurrentCurrencySymbol();?><?php echo $_coreHelper->getCurrentCurrencyPrice($product->getOriginalPrice());?></h3>
+	<h3>Discount Price : <?php echo $_coreHelper->getCurrentCurrencySymbol();?><?php echo $_coreHelper->getCurrentCurrencyPrice($product->getDiscountedPrice());?> / Per Person</h3>
+	<h3>Stock : <span class="stock-availability"></span></h3>
+    <div style="margin-top: 10px;margin-bottom: 10px;border: 5px solid;border-color: antiquewhite;">
+	    <div style="margin: 10px;" class="form">
+		    <?php
+
+			    if($attribute_set_id==$_coreHelper->getSmallGroupId())
+			    {	
+			    	?>
+			    	
+						<label>Departure dates </label>
+							<br>
+							<select class="departure_dates">
+							
+							<?php
+							foreach ($productAttributeOptions as $key => $row)
+							{	
+
+								if($productAttributeOptions[$key]['attribute_code']=="departure_dates")
+								{	
+
+									$departureDateOptions = [];
+									foreach ($row['values'] as $k => $r) 
+									{	
+										if( strtotime($r['label']) > strtotime(date('Y-m-d')) )
+										{	
+											$departureDateOptions[] = $r['label'];
+											
+										}
+									}
+
+									if($departureDateOptions)
+									{	
+										?>
+										<option value="">Chose an Option</option>
+										<?php
+										foreach ($departureDateOptions as $k => $value)
+										{
+											?>
+											<option value="<?php echo $value;?>"><?php echo $_coreHelper->getFormattedStartAndEndDates($value,$duration);?></option>
+											<?php
+										}
+									}
+									else
+									{
+										?>
+											<option value="">No Departure Date Found</option>
+										<?php
+									}
+								}
+							}
+							?>
+						</select>
+						<br>
+						<label>No. of Travellers</label>
+						<br>
+						<select disabled="disabled" class="no_of_travellers">
+							<option value="" >Chose an Option</option>
+						</select>
+						<br>
+						<br>
+						
+				
+			    	<?php
+			    }
+			    if($attribute_set_id==$_coreHelper->getPrivateGroupId())
+			    {
+			    	?>
+						
+						<label>Start Date</label>
+						<input type="date" name="departure_dates" class="departure_dates">
+						<br>
+						<label>End Date</label>
+						<input type="text" name="end_date" class="end_date">
+						<br>
+						<label>No. of Travellers</label>
+						<select disabled="disabled" class="no_of_travellers">
+							<option value="">Chose an Option</option>
+						</select>
+						<br>
+						<label>No. of Kids</label>
+						<br>
+						<select disabled="disabled" class="no_of_kids">
+							<option value="">Chose an Option</option>
+						</select>
+						<br>
+						<br>
+			    	<?php
+			    }
+			?>
+			<button type="submit" class="book_now" name="submit" value="0">Book Now</button>
+			<div class="discount-price">
+				<?php
+				if(!empty($discountPrices))
+				{
+					foreach ($discountPrices as $key => $row)
+					{	
+						if($attribute_set_id == $_coreHelper->getPrivateGroupId())
+						{
+							$departureDate 	= date('F ',strtotime($row['departure_date']));
+							$discountMsg 	= 'Departure month';		
+						}
+						else
+						{
+							$departureDate 		= date('D, d M',strtotime($row['departure_date']));
+							$discountMsg 	= 'Departure date';
+						}
+
+						$discountPercentage = $row['percentage'];
+						echo "Save ".$discountPercentage."% - ".$discountMsg." ".$departureDate."<br>";
+					}
+				}
+				?>
+			</div>
+			<div class="error-msg" style="display: none;">
+			</div>
+			<div class="success-msg" style="display: none;">
+			</div>
+		</div>
+		<div class="loader" style="display: none;">L O A D I N G . . . . . .</div>
+	</div>
+</div>
+<script type="text/x-magento-init">
+    {
+        "*": {
+            "Magento_Catalog/js/custom": {
+                "productId"			: "<?= /* @escapeNotVerified */ $product->getEntityId() ?>",
+                "attributeSetId"	: "<?= /* @escapeNotVerified */ $attribute_set_id ?>",
+                "privetGroupId"		: "<?= /* @escapeNotVerified */ $_coreHelper->getPrivateGroupId() ?>",
+                "baseUrl"			: "<?= /* @escapeNotVerified */ $_coreHelper->getBaseUrl() ?>",
+                "duration"			: "<?= /* @escapeNotVerified */ $duration ?>"
+            }
+        }
+    }
+</script>
+<script>
+	/*
+require([
+    "jquery",
+    "jquery/ui"
+    
+], function($){
+	$(document).ready(function()
+	{	
+		$('.departure_dates').change(function()
+		{	
+			<?php
+			if($attribute_set_id==$_coreHelper->getPrivateGroupId())
+	    	{
+	    		?>
+
+		    		var endDate = "";
+					
+					var startDate = $(this).val();
+					var today = new Date();
+					var dd = today.getDate();
+					var mm = today.getMonth()+1; //January is 0!
+					if(mm < 10)
+				    {
+				    	mm = '0'+mm;
+				    }
+				    if(dd < 10)
+				    {
+				    	dd = '0'+dd;
+				    }
+					var yyyy = today.getFullYear();
+					currentDate = yyyy + '-' + mm + '-' + dd;
+					
+					if(startDate > currentDate)
+					{
+					    if(startDate)
+					    {
+						    var newdate = new Date(startDate);
+						    var noOfDays = parseInt("<?php echo $duration;?>")
+						    newdate.setDate(newdate.getDate() + noOfDays);
+						    
+						    var dd = newdate.getDate();
+						    var mm = newdate.getMonth() + 1;
+						    var y = newdate.getFullYear();
+						    if(mm < 10)
+						    {
+						    	mm = '0'+mm;
+						    }
+						    if(dd < 10)
+						    {
+						    	dd = '0'+dd;
+						    }
+						    var endDate = mm + '/' + dd + '/' + y;
+						}
+					    $('.end_date').val(endDate);
+					    updateNoOfTravellers()
+					}
+					else
+					{	
+						alert('Date must be grater than current Date');
+						$('.no_of_travellers').html("<option value=''>Chose an Option</option>");
+						$('.no_of_travellers').attr("disabled",'disabled');
+						$('.end_date').val('');
+					}
+	    		<?php
+	    	}
+	    	else
+	    	{
+	    		?>
+	    		 	updateNoOfTravellers()
+	    		<?php
+	    	}
+			?>
+		    //checkProductStockAndCart();
+		});*/
+		
+		/*$('.no_of_travellers').change(function()
+		{	
+			<?php
+			if($attribute_set_id==$_coreHelper->getPrivateGroupId())
+	    	{
+	    		?>
+	    		var departure_dates 	= $('.departure_dates').val();
+				var noOfTravels 		= $(this).val();
+				$('.loader').show();
+				$.ajax(
+				{
+					type:"POST",
+					url: "<?php echo $_coreHelper->getBaseUrl();?>easytravel_core/ajax/index",
+		            data:
+					{	
+						'product_id'		:'<?php echo $product->getEntityId();?>',
+						'departure_dates'	: departure_dates, 
+						'no_of_travellers'	: noOfTravels, 
+						'product_group'		:'<?php echo $attribute_set_id;?>',
+						'type'				:'getProductOptions',
+					},
+					success: function(response)
+					{
+						//response = $.parseJSON(response);
+						if(response.status==1)
+						{	
+							var options =""; 
+							$.each(response.noOfKids, function(index, value){
+							  options += "<option value='"+value+"'>"+value+"</option>";
+							});
+							$('.no_of_kids').html("<option value=''>Chose an Option</option>"+options);
+							$('.no_of_kids').removeAttr('disabled');
+						}
+						$('.loader').hide();
+					}
+				});
+	    		<?php
+	    	}
+	    	else
+	    	{
+	    		?>
+	    			checkProductStockAndCart();
+	    		<?php
+	    	}
+	    	?>
+		});
+		<?php
+		if($attribute_set_id==$_coreHelper->getPrivateGroupId())
+    	{
+    		?>
+				$('.no_of_kids').change(function()
+				{	
+					checkProductStockAndCart();
+				});
+			<?php
+		}?>*/
+
+		/*function updateNoOfTravellers()
+		{
+			var departure_dates 	= $('.departure_dates').val();
+			$('.book_now').removeAttr('disabled');
+			if(departure_dates)
+			{
+				$('.loader').show();
+				$.ajax(
+				{
+					type:"POST",
+					url: "<?php echo $_coreHelper->getBaseUrl();?>easytravel_core/ajax/index",
+	                data:
+					{	
+						'product_id'		:'<?php echo $product->getEntityId();?>',
+						'departure_dates'	: departure_dates, 
+						'product_group'		:'<?php echo $attribute_set_id;?>',
+						'type'				:'getProductOptions',
+					},
+					success: function(response)
+					{
+						//response = $.parseJSON(response);
+						if(response.status==1)
+						{	
+							var options =""; 
+							$.each(response.noOfTravelers, function(index, value){
+							  options += "<option value='"+value+"'>"+value+"</option>";
+							});
+							$('.no_of_travellers').html("<option value=''>Chose an Option</option>"+options);
+							$('.no_of_travellers').removeAttr('disabled');
+							$('.no_of_kids').html("<option value=''>Chose an Option</option>");
+							$('.no_of_kids').attr("disabled",'disabled');
+						}
+
+						$('.loader').hide();
+					}
+				});
+			}
+			else
+			{
+				$('.no_of_travellers').html("<option value=''>Chose an Option</option>");
+				$('.no_of_travellers').attr("disabled",'disabled');
+			}
+			changeBtnStatus(0);
+		}
+
+		
+
+
+		function changeBtnStatus(itemId)
+		{
+			if(itemId)
+			{	
+				$('.book_now').html('Update Booking');
+				$('.book_now').val(itemId);
+				
+			}
+			else
+			{
+				$('.book_now').html('Book Now');
+				$('.book_now').val(0);
+			}
+		}
+
+		/*$('.book_now').click(function()
+		{	
+			var no_of_travellers	= $('.no_of_travellers').val();
+			var departure_dates 	= $('.departure_dates').val();
+			var noOfKids 			= "";
+			var aErrors = {};
+			
+			if(!no_of_travellers)
+		    {
+		       aErrors['no_of_travellers'] = 'No Of Travellers is Required';
+		    }
+		    if(!departure_dates)
+		    {
+		       aErrors['departure_dates'] = 'Departure Date is Required';
+		    }
+		    
+		    <?php
+			if($attribute_set_id==$_coreHelper->getPrivateGroupId())
+	    	{
+	    		?>
+					noOfKids = $('.no_of_kids').val();
+					if(!noOfKids)
+				    {
+				       aErrors['no_of_kids'] = 'No of Kids is Required';
+				    }
+				<?php
+			}?>
+			var errsLength = Object.keys(aErrors).length;
+		    if(errsLength > 0)
+		    {
+		    	var errorMsg = "";
+		      	$.each(aErrors, function( key, value ) 
+		      	{
+		        	errorMsg += value;
+		        	errorMsg += "<br>";
+		      	});
+		      	$('.error-msg').html(errorMsg);
+		        $('.error-msg').show().delay(3000).fadeOut();
+		    }
+		    else
+			{	
+				$('.loader').show();
+				addProductIntoCart(no_of_travellers,departure_dates,noOfKids);
+			}
+		});*/
+
+		/*function addProductIntoCart(no_of_travellers,departure_dates,noOfKids)
+		{
+			$.ajax(
+				{
+					type:"POST",
+					url: "<?php echo $_coreHelper->getBaseUrl();?>easytravel_core/ajax/index",
+	                data:
+					{	
+						'product_id'		:'<?php echo $product->getEntityId();?>',
+						'product_group'		:'<?php echo $attribute_set_id;?>',
+						'no_of_travellers'	: no_of_travellers,
+						'departure_dates'	: departure_dates, 
+						'no_of_kids'		: noOfKids, 
+						'item_id'			: $('.book_now').val(), 
+						'type'				: 'addToCart',
+					},
+					success: function(result)
+					{
+						//result = $.parseJSON(result);
+						if(result.status==1)
+						{	
+							$('.success-msg').html("Cart Update Successfully");
+		        			$('.success-msg').show().delay(3000).fadeOut();
+					        
+					      	//updateMiniCart();
+							changeBtnStatus(result.item_id);
+						}
+						
+						$('.loader').hide();
+					}
+				});
+		}
+	});
+});*/
+</script>

@@ -1,0 +1,10 @@
+.checkout-index-index .nav-sections{ display: block;}
+
+.checkStatus{
+	background: #00ff00 !important;
+	color: #fff;
+}
+
+@media screen (min-width: 768px){
+	.checkout-index-index .nav-toggle { display: block;}
+}

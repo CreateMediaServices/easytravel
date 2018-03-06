@@ -1,0 +1,183 @@
+
+<?php
+	$objectManager  		= \Magento\Framework\App\ObjectManager::getInstance();
+	$_coreHelper     		= $objectManager->get('Easytravel\Core\Helper\Functions');
+    $product        		= $objectManager->get('Magento\Framework\Registry')->registry('current_product');//get current product
+    $productTypeInstance 	= $product->getTypeInstance();
+    $associatedProducts 	= $productTypeInstance->getUsedProducts($product);
+    $attributeSet 			= $objectManager->create('Magento\Eav\Api\AttributeSetRepositoryInterface');
+    $attributeSetRepository = $attributeSet->get($product->getAttributeSetId());
+    $attribute_set_name 	= $attributeSetRepository->getAttributeSetName(); // get Attribute ID
+    $attribute_set_id 		= $attributeSetRepository->getAttributeSetId(); // get Attribute ID
+    $departuresData 		= array();
+    if($attribute_set_id==$_coreHelper->getSmallGroupId())
+    {   
+        foreach ($associatedProducts  as $childProduct) 
+        {   
+            $departureDate                  = $childProduct->getResource()->getAttribute('departure_dates')->getFrontend()->getValue($childProduct);
+            $noOfTravels                    = $childProduct->getResource()->getAttribute('no_of_travellers')->getFrontend()->getValue($childProduct);
+            $month                          = date("M Y",strtotime($departureDate));
+            $stockState                     = $objectManager->get('\Magento\CatalogInventory\Api\StockStateInterface');
+            $_tempArray['departure_date']   = $childProduct->getResource()->getAttribute('departure_dates')->getFrontend()->getValue($childProduct);
+            $_tempArray['price']            = $childProduct->getPrice();
+            $_tempArray['quantity']         = $stockState->getStockQty($childProduct->getId(), $childProduct->getStore()->getWebsiteId());
+            if($noOfTravels == '1')
+            {   
+                if (array_key_exists($month,$departuresData))
+                {   
+                    $departuresData[$month][] = $_tempArray;
+                }
+                else
+                {
+                    $departuresData[$month] = array();
+                    $departuresData[$month][] = $_tempArray;
+                }
+            }
+        }
+    }
+    if($attribute_set_id==$_coreHelper->getPrivateGroupId())
+    {   
+        $count  = 0;
+        foreach ($associatedProducts  as $childProduct) 
+        {   
+            /*$noOfTravels                    = $childProduct->getResource()->getAttribute('no_of_travellers')->getFrontend()->getValue($childProduct);
+            $departureDate                  = $childProduct->getResource()->getAttribute('departure_dates')->getFrontend()->getValue($childProduct);
+            echo "NAME==: ".$childProduct->getName()."<br>";
+            echo "noOfTravels==: ".$noOfTravels."<br>";
+            echo "departureDate==: ".$departureDate."<br>";*/
+
+            $departureDate                  = $childProduct->getResource()->getAttribute('departure_dates')->getFrontend()->getValue($childProduct);
+            $noOfTravels                    = $childProduct->getResource()->getAttribute('no_of_travellers')->getFrontend()->getValue($childProduct);
+            $child                          = $childProduct->getResource()->getAttribute('child')->getFrontend()->getValue($childProduct);
+            $month                          = date("M",strtotime($departureDate));
+            
+            $_tempArray['price']            = $childProduct->getPrice();
+            $_tempArray['person']           = $noOfTravels;
+            if($child==0)
+            {
+
+
+                if (array_key_exists($month,$departuresData))
+                {   
+                    $departuresData[$month][] = $_tempArray;
+                }
+                else
+                {
+                    $departuresData[$month] = array();
+
+                    $departuresData[$month][] = $_tempArray;
+                }
+                
+            }
+            
+        }
+    }
+?>
+
+<?php
+
+if($attribute_set_id==$_coreHelper->getSmallGroupId())
+{   
+    
+    ?>
+        <table style="width:100%; background-color: antiquewhite;" >
+          <tr>
+            <th>Dates</th>
+            <th>Availability</th> 
+            <th>Price</th>
+          </tr>
+          <?php
+            if(!empty($departuresData))
+            {
+                foreach ($departuresData as $key => $row)
+                {   
+                    ?>
+                    <tr style="width:100%; background-color: bisque;">
+                        <td><?php echo $key;?></td>
+                    </tr>
+                    <?php
+                    foreach ($row as $k1=> $r1) 
+                    {   
+
+                        $currentMonth   = date("m"); 
+                        $departureMonth = substr($r1['departure_date'], 5,2);
+                        
+                        if(true)//if($departureMonth==$currentMonth || $departureMonth > $currentMonth)
+                        {   
+                            if($r1['quantity'] > 0)
+                            {   
+                                $fromDate   = date("D, d M",strtotime($r1['departure_date']));
+                                $toDate     = date('Y-m-d', strtotime($r1['departure_date']. ' + 5 days'));
+                                
+                                ?>  
+                                    
+                                    <tr >
+                                        <td><?php echo $fromDate;?> -  <?php echo date("D, d M",strtotime($toDate));?> </td>
+                                        <td><?php echo $r1['quantity'];?> </td>
+                                        <td>$ <?php echo bcadd(0,$r1['price'],2);?> </td>
+                                    </tr>
+                                <?php
+                            }
+                        }
+                    }
+                    
+                }
+            }
+            ?>
+        </table>
+    <?php
+}
+if($attribute_set_id==$_coreHelper->getPrivateGroupId())
+{  
+    if(!empty($departuresData))
+    {
+        ?>
+            <table style="width:100%; background-color: antiquewhite;" >
+                <tr>
+                    <th>&nbsp;</th>
+                    <?php 
+                    foreach ($departuresData as $key => $row) 
+                    {   
+                        $months[] = $key;
+                        $totalPerson = count($departuresData[$key]); 
+                        ?>
+                            <th><?php echo strtoupper($key);?></th>
+                        <?php
+                    }
+                    ?>
+                </tr>
+                <?php
+
+                if(!empty($months))
+                {
+                       
+                    $count =1;
+                    for ($i=0; $i < $totalPerson; $i++) 
+                    {   
+                        ?>  
+                            <tr>
+                                <td><?php echo $count;?> Person </td>
+
+                                <?php
+
+                                    for($j=0; $j <count($months); $j++) 
+                                    {   
+                                        $currentMonthData  = $departuresData[$months[$j]];
+                                        $price = $currentMonthData[$i]['price'];
+                                        ?>
+                                            <td>$ <?php echo bcadd(0,$price,2);?> </td>
+                                        <?php
+                                    }
+                                ?>
+                            </tr>
+                        <?php
+                        
+                        $count++;
+                    }
+                }
+                ?>
+            </table>
+        <?php
+    }
+}
+?>
